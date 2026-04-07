@@ -4,261 +4,269 @@ Official colors from https://c4model.com / Structurizr reference implementation
 """
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
-from matplotlib.lines import Line2D
-import numpy as np
+from matplotlib.patches import FancyBboxPatch
+from matplotlib.patches import Rectangle
 
 # ─── Official C4 Colors ────────────────────────────────────────────────────────
 C4_COLORS = {
-    "person":            {"bg": "#08427B", "fg": "#FFFFFF", "border": "#052E56"},
-    "system":            {"bg": "#1168BD", "fg": "#FFFFFF", "border": "#0B4884"},
-    "system_ext":        {"bg": "#999999", "fg": "#FFFFFF", "border": "#6B6B6B"},
-    "container":         {"bg": "#438DD5", "fg": "#FFFFFF", "border": "#2E6295"},
-    "container_ext":     {"bg": "#B3B3B3", "fg": "#000000", "border": "#828282"},
-    "container_db":      {"bg": "#438DD5", "fg": "#FFFFFF", "border": "#2E6295"},
-    "component":         {"bg": "#85BBF0", "fg": "#000000", "border": "#5D82A8"},
-    "component_ext":     {"bg": "#CCCCCC", "fg": "#000000", "border": "#AAAAAA"},
-    "boundary":          {"bg": "#FFFFFF", "fg": "#444444", "border": "#888888"},
+    "person":        {"bg": "#08427B", "fg": "#FFFFFF", "border": "#052E56"},
+    "system":        {"bg": "#1168BD", "fg": "#FFFFFF", "border": "#0B4884"},
+    "system_ext":    {"bg": "#999999", "fg": "#FFFFFF", "border": "#6B6B6B"},
+    "container":     {"bg": "#438DD5", "fg": "#FFFFFF", "border": "#2E6295"},
+    "container_ext": {"bg": "#B3B3B3", "fg": "#000000", "border": "#828282"},
+    "container_db":  {"bg": "#438DD5", "fg": "#FFFFFF", "border": "#2E6295"},
+    "component":     {"bg": "#85BBF0", "fg": "#000000", "border": "#5D82A8"},
+    "boundary":      {"bg": "#FFFFFF", "fg": "#444444", "border": "#888888"},
 }
 
-FONT_FAMILY = "DejaVu Sans"
+FONT = "DejaVu Sans"
 
 
 # ─── Person ───────────────────────────────────────────────────────────────────
-def draw_person(ax, cx, cy, label, descr="", kind="person", w=1.8, h=2.6):
-    """Draw a C4 Person element (head + body + label box)."""
-    colors = C4_COLORS[kind]
-    bg, fg, border = colors["bg"], colors["fg"], colors["border"]
+def draw_person(ax, cx, cy, label, descr="", kind="person", w=9.0, h=6.0):
+    """
+    C4 Person: rounded rectangle with a circle head protruding above.
+    All text is placed INSIDE the rectangle — no overlaps.
+    cy = vertical centre of the ENTIRE element (head + box).
+    """
+    c = C4_COLORS[kind]
+    bg, fg, border = c["bg"], c["fg"], c["border"]
 
-    # Head
-    head_r = 0.28
-    head = plt.Circle((cx, cy + h * 0.30), head_r, color=bg, zorder=3)
-    ax.add_patch(head)
-    head_border = plt.Circle((cx, cy + h * 0.30), head_r,
-                              fill=False, edgecolor=border, linewidth=1.5, zorder=4)
-    ax.add_patch(head_border)
+    head_r = w * 0.13           # radius of head circle
+    gap    = head_r * 0.4       # gap between head bottom and box top
+    box_h  = h - 2 * head_r - gap   # box occupies the lower part
 
-    # Body (simple stick figure torso via rectangle)
-    body_w, body_h = 0.50, 0.45
-    body = FancyBboxPatch(
-        (cx - body_w / 2, cy + h * 0.30 - head_r - body_h - 0.04),
-        body_w, body_h,
-        boxstyle="round,pad=0.02",
-        facecolor=bg, edgecolor=border, linewidth=1.5, zorder=3
-    )
-    ax.add_patch(body)
+    # Vertical positions
+    box_bot = cy - h / 2
+    box_top = box_bot + box_h
+    head_cy = box_top + gap + head_r   # head centre
 
-    # Label box
-    box_top = cy + h * 0.30 - head_r - body_h - 0.04
-    box_h = 0.80
-    box = FancyBboxPatch(
-        (cx - w / 2, box_top - box_h - 0.15),
-        w, box_h,
-        boxstyle="round,pad=0.06",
-        facecolor=bg, edgecolor=border, linewidth=1.5, zorder=3
-    )
-    ax.add_patch(box)
-
-    label_y = box_top - box_h / 2 - 0.15
-    ax.text(cx, label_y + 0.15, label,
-            ha="center", va="center", fontsize=10, fontweight="bold",
-            color=fg, fontfamily=FONT_FAMILY, zorder=5, wrap=True)
-    if descr:
-        ax.text(cx, label_y - 0.18, f"[Person]\n{descr}",
-                ha="center", va="center", fontsize=7.5,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5,
-                style="italic", multialignment="center")
-
-
-# ─── Rectangle Box (System / Container / Component) ───────────────────────────
-def draw_box(ax, cx, cy, w, h, label, type_label="", tech="", descr="",
-             kind="container", dashed=False):
-    """Draw a C4 rounded rectangle element."""
-    colors = C4_COLORS[kind]
-    bg, fg, border = colors["bg"], colors["fg"], colors["border"]
-
-    ls = (0, (6, 3)) if dashed else "solid"
-
+    # ── Box ──
     rect = FancyBboxPatch(
-        (cx - w / 2, cy - h / 2), w, h,
-        boxstyle="round,pad=0.08",
-        facecolor=bg, edgecolor=border, linewidth=2.0,
-        linestyle=ls, zorder=3
-    )
-    ax.add_patch(rect)
-
-    # Header strip (darker top band with label)
-    header_h = h * 0.30
-    header = FancyBboxPatch(
-        (cx - w / 2, cy + h / 2 - header_h), w, header_h,
-        boxstyle="round,pad=0.08",
-        facecolor=border, edgecolor=border, linewidth=0, zorder=4
-    )
-    ax.add_patch(header)
-
-    # Type label (small, italic, inside header)
-    if type_label:
-        ax.text(cx, cy + h / 2 - header_h * 0.30,
-                f"[{type_label}]",
-                ha="center", va="center", fontsize=7.5,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5, style="italic")
-
-    # Main label (bold, centered in header)
-    ax.text(cx, cy + h / 2 - header_h * 0.72,
-            label,
-            ha="center", va="center", fontsize=10, fontweight="bold",
-            color=fg, fontfamily=FONT_FAMILY, zorder=5)
-
-    # Tech label
-    if tech:
-        ax.text(cx, cy - 0.05,
-                f"[{tech}]",
-                ha="center", va="center", fontsize=8,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5, style="italic")
-
-    # Description
-    if descr:
-        ax.text(cx, cy - h * 0.25,
-                descr,
-                ha="center", va="center", fontsize=8,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5,
-                multialignment="center", wrap=True)
-
-
-# ─── Cylinder (Database) ──────────────────────────────────────────────────────
-def draw_cylinder(ax, cx, cy, w, h, label, type_label="ContainerDb", tech="",
-                  descr="", kind="container_db"):
-    """Draw a C4 database cylinder shape."""
-    colors = C4_COLORS[kind]
-    bg, fg, border = colors["bg"], colors["fg"], colors["border"]
-
-    ew = w          # ellipse width = box width
-    eh = h * 0.18   # ellipse height (cap)
-
-    # Body rectangle
-    rect = mpatches.Rectangle(
-        (cx - w / 2, cy - h / 2), w, h,
+        (cx - w / 2, box_bot), w, box_h,
+        boxstyle="round,pad=0.07",
         facecolor=bg, edgecolor=border, linewidth=2.0, zorder=3
     )
     ax.add_patch(rect)
 
-    # Bottom cap ellipse
-    bot_ellipse = mpatches.Ellipse(
-        (cx, cy - h / 2), ew, eh,
-        facecolor=bg, edgecolor=border, linewidth=2.0, zorder=4
-    )
-    ax.add_patch(bot_ellipse)
+    # ── Head ──
+    head = plt.Circle((cx, head_cy), head_r, color=bg, zorder=4)
+    ax.add_patch(head)
+    ring = plt.Circle((cx, head_cy), head_r,
+                       fill=False, edgecolor=border, linewidth=2.0, zorder=5)
+    ax.add_patch(ring)
 
-    # Top cap ellipse
-    top_ellipse = mpatches.Ellipse(
-        (cx, cy + h / 2), ew, eh,
-        facecolor=border, edgecolor=border, linewidth=2.0, zorder=4
-    )
-    ax.add_patch(top_ellipse)
+    # ── Text inside box ──
+    # [Person] italic tag near top of box
+    ax.text(cx, box_bot + box_h * 0.82,
+            "[Person]",
+            ha="center", va="center",
+            fontsize=8.5, color=fg, fontfamily=FONT,
+            style="italic", zorder=6)
 
-    # Type label
-    if type_label:
-        ax.text(cx, cy + h / 2 + eh * 0.05,
-                f"[{type_label}]",
-                ha="center", va="center", fontsize=7.5,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5, style="italic")
-
-    ax.text(cx, cy + h * 0.18,
+    # Name bold in middle
+    ax.text(cx, box_bot + box_h * 0.52,
             label,
-            ha="center", va="center", fontsize=10, fontweight="bold",
-            color=fg, fontfamily=FONT_FAMILY, zorder=5)
+            ha="center", va="center",
+            fontsize=11, fontweight="bold",
+            color=fg, fontfamily=FONT,
+            multialignment="center", zorder=6)
+
+    # Description italic at bottom
+    if descr:
+        ax.text(cx, box_bot + box_h * 0.20,
+                descr,
+                ha="center", va="center",
+                fontsize=8.5, color=fg, fontfamily=FONT,
+                style="italic", multialignment="center", zorder=6)
+
+
+# ─── Rectangle Box ────────────────────────────────────────────────────────────
+def draw_box(ax, cx, cy, w, h, label, type_label="", tech="", descr="",
+             kind="container"):
+    """
+    C4 rectangular element with a darker header band.
+    Text layout:
+      header  → [type_label]  (italic, small)
+                label         (bold)
+      body    → [tech]        (italic)
+                descr         (regular, multi-line)
+    All positions are computed from the actual box geometry — no magic fractions.
+    """
+    c = C4_COLORS[kind]
+    bg, fg, border = c["bg"], c["fg"], c["border"]
+
+    box_l = cx - w / 2
+    box_b = cy - h / 2
+    box_t = cy + h / 2
+
+    header_h = max(h * 0.28, 2.2)   # header band height (min 2.2 units)
+    body_top = box_t - header_h      # top of the white-ish body area
+
+    # ── Outer box ──
+    rect = FancyBboxPatch(
+        (box_l, box_b), w, h,
+        boxstyle="round,pad=0.09",
+        facecolor=bg, edgecolor=border, linewidth=2.0, zorder=3
+    )
+    ax.add_patch(rect)
+
+    # ── Header band (darker shade) ──
+    # Use a plain Rectangle clipped to the top portion; overlay on rounded rect
+    header = FancyBboxPatch(
+        (box_l, body_top), w, header_h,
+        boxstyle="round,pad=0.09",
+        facecolor=border, edgecolor=border, linewidth=0, zorder=4
+    )
+    ax.add_patch(header)
+
+    # ── Header text ──
+    if type_label:
+        ax.text(cx, body_top + header_h * 0.75,
+                f"[{type_label}]",
+                ha="center", va="center",
+                fontsize=8, color=fg, fontfamily=FONT,
+                style="italic", zorder=6)
+
+    ax.text(cx, body_top + header_h * 0.32,
+            label,
+            ha="center", va="center",
+            fontsize=11, fontweight="bold",
+            color=fg, fontfamily=FONT, zorder=6)
+
+    # ── Body text ──
+    # Available body height from box_b to body_top
+    body_h = body_top - box_b
+
+    # Tech label — placed in upper quarter of body
+    if tech:
+        ax.text(cx, box_b + body_h * 0.78,
+                f"[{tech}]",
+                ha="center", va="center",
+                fontsize=8.5, color=fg, fontfamily=FONT,
+                style="italic", zorder=6)
+
+    # Description — centred in lower part of body
+    if descr:
+        ax.text(cx, box_b + body_h * 0.38,
+                descr,
+                ha="center", va="center",
+                fontsize=8.5, color=fg, fontfamily=FONT,
+                multialignment="center", zorder=6)
+
+
+# ─── Cylinder (Database / ContainerDb) ───────────────────────────────────────
+def draw_cylinder(ax, cx, cy, w, h, label, type_label="ContainerDb",
+                  tech="", descr="", kind="container_db"):
+    """C4 database cylinder: rectangle body + ellipse caps."""
+    c = C4_COLORS[kind]
+    bg, fg, border = c["bg"], c["fg"], c["border"]
+
+    eh = h * 0.16          # ellipse cap height
+    body_h = h - eh / 2
+
+    # Body
+    rect = Rectangle(
+        (cx - w / 2, cy - h / 2), w, body_h,
+        facecolor=bg, edgecolor=border, linewidth=2.0, zorder=3
+    )
+    ax.add_patch(rect)
+
+    # Bottom cap
+    ax.add_patch(mpatches.Ellipse(
+        (cx, cy - h / 2 + eh / 2), w, eh,
+        facecolor=bg, edgecolor=border, linewidth=2.0, zorder=4
+    ))
+
+    # Top cap (darker = header)
+    ax.add_patch(mpatches.Ellipse(
+        (cx, cy - h / 2 + body_h), w, eh,
+        facecolor=border, edgecolor=border, linewidth=2.0, zorder=4
+    ))
+
+    # Type label inside top cap
+    if type_label:
+        ax.text(cx, cy - h / 2 + body_h,
+                f"[{type_label}]",
+                ha="center", va="center",
+                fontsize=8, color=fg, fontfamily=FONT,
+                style="italic", zorder=6)
+
+    # Label
+    ax.text(cx, cy + h * 0.10,
+            label,
+            ha="center", va="center",
+            fontsize=11, fontweight="bold",
+            color=fg, fontfamily=FONT, zorder=6)
 
     if tech:
-        ax.text(cx, cy - 0.05,
+        ax.text(cx, cy - h * 0.10,
                 f"[{tech}]",
-                ha="center", va="center", fontsize=8,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5, style="italic")
+                ha="center", va="center",
+                fontsize=8.5, color=fg, fontfamily=FONT,
+                style="italic", zorder=6)
 
     if descr:
-        ax.text(cx, cy - h * 0.28,
+        ax.text(cx, cy - h * 0.35,
                 descr,
-                ha="center", va="center", fontsize=8,
-                color=fg, fontfamily=FONT_FAMILY, zorder=5,
-                multialignment="center")
+                ha="center", va="center",
+                fontsize=8, color=fg, fontfamily=FONT,
+                multialignment="center", zorder=6)
 
 
 # ─── Dashed Boundary ──────────────────────────────────────────────────────────
 def draw_boundary(ax, x, y, w, h, label=""):
-    """Draw a dashed system boundary rectangle."""
-    rect = FancyBboxPatch(
+    """Dashed system-boundary rectangle."""
+    ax.add_patch(FancyBboxPatch(
         (x, y), w, h,
-        boxstyle="round,pad=0.1",
+        boxstyle="round,pad=0.12",
         fill=False,
         edgecolor=C4_COLORS["boundary"]["border"],
         linewidth=1.8,
         linestyle=(0, (8, 4)),
         zorder=2
-    )
-    ax.add_patch(rect)
+    ))
     if label:
-        ax.text(x + 0.20, y + h - 0.10, label,
-                ha="left", va="top", fontsize=9,
+        ax.text(x + 0.3, y + h - 0.15, label,
+                ha="left", va="top",
+                fontsize=9.5, fontweight="bold", style="italic",
                 color=C4_COLORS["boundary"]["fg"],
-                fontfamily=FONT_FAMILY, zorder=5,
-                fontweight="bold", style="italic")
+                fontfamily=FONT, zorder=5)
 
 
-# ─── Arrow ────────────────────────────────────────────────────────────────────
+# ─── Straight Arrow ───────────────────────────────────────────────────────────
 def draw_arrow(ax, x1, y1, x2, y2, label="", tech="",
-               color="#707070", lw=1.8, label_offset=(0, 0)):
-    """Draw a directed arrow with optional label and technology."""
-    ax.annotate(
-        "",
+               color="#606060", lw=1.8, label_offset=(0, 0)):
+    ax.annotate("",
         xy=(x2, y2), xytext=(x1, y1),
-        arrowprops=dict(
-            arrowstyle="-|>",
-            color=color,
-            lw=lw,
-            mutation_scale=16,
-            connectionstyle="arc3,rad=0.0"
-        ),
-        zorder=6
-    )
-    if label or tech:
-        mx = (x1 + x2) / 2 + label_offset[0]
-        my = (y1 + y2) / 2 + label_offset[1]
-        full = label
-        if tech:
-            full += f"\n[{tech}]"
-        ax.text(mx, my, full,
-                ha="center", va="center", fontsize=7.5,
-                color="#333333",
-                fontfamily=FONT_FAMILY, zorder=7,
-                bbox=dict(facecolor="white", edgecolor="none",
-                          alpha=0.85, boxstyle="round,pad=0.15"),
-                multialignment="center")
+        arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
+                        mutation_scale=16,
+                        connectionstyle="arc3,rad=0.0"),
+        zorder=6)
+    _arrow_label(ax, x1, y1, x2, y2, label, tech, label_offset)
 
 
-# ─── Curved Arrow (arc) ───────────────────────────────────────────────────────
+# ─── Arc Arrow ────────────────────────────────────────────────────────────────
 def draw_arc_arrow(ax, x1, y1, x2, y2, label="", tech="",
-                   color="#707070", lw=1.8, rad=0.3, label_offset=(0, 0)):
-    ax.annotate(
-        "",
+                   color="#606060", lw=1.8, rad=0.25, label_offset=(0, 0)):
+    ax.annotate("",
         xy=(x2, y2), xytext=(x1, y1),
-        arrowprops=dict(
-            arrowstyle="-|>",
-            color=color,
-            lw=lw,
-            mutation_scale=16,
-            connectionstyle=f"arc3,rad={rad}"
-        ),
-        zorder=6
-    )
-    if label or tech:
-        mx = (x1 + x2) / 2 + label_offset[0]
-        my = (y1 + y2) / 2 + label_offset[1]
-        full = label
-        if tech:
-            full += f"\n[{tech}]"
-        ax.text(mx, my, full,
-                ha="center", va="center", fontsize=7.5,
-                color="#333333",
-                fontfamily=FONT_FAMILY, zorder=7,
-                bbox=dict(facecolor="white", edgecolor="none",
-                          alpha=0.85, boxstyle="round,pad=0.15"),
-                multialignment="center")
+        arrowprops=dict(arrowstyle="-|>", color=color, lw=lw,
+                        mutation_scale=16,
+                        connectionstyle=f"arc3,rad={rad}"),
+        zorder=6)
+    _arrow_label(ax, x1, y1, x2, y2, label, tech, label_offset)
+
+
+def _arrow_label(ax, x1, y1, x2, y2, label, tech, label_offset):
+    if not label and not tech:
+        return
+    mx = (x1 + x2) / 2 + label_offset[0]
+    my = (y1 + y2) / 2 + label_offset[1]
+    text = label + (f"\n[{tech}]" if tech else "")
+    ax.text(mx, my, text,
+            ha="center", va="center",
+            fontsize=8, color="#222222", fontfamily=FONT,
+            multialignment="center", zorder=7,
+            bbox=dict(facecolor="white", edgecolor="none",
+                      alpha=0.88, boxstyle="round,pad=0.2"))
